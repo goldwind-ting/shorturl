@@ -1,0 +1,15 @@
+@local = http://127.0.0.1:3000
+ab -c 30 -k -t 30 http://localhost:3000/query?short_url=5N4gqg
+
+###
+GET {{local}}/
+
+
+###
+POST {{local}}/short
+Content-Type: application/json
+
+{ "original_url": "https://github.com/shorturl/commit/70536a1d2a91c5fb14d848e76ba036407217559f"}
+
+###
+GET {{local}}/query?short_url=5N4gqg

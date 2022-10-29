@@ -1,0 +1,18 @@
+[package]
+name = "shorturl"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.0-rc.1"
+tokio = { version = "1.21.2", features = [ "full" ] }
+mongodb = { version = "2.3.1", features = [ "tokio-runtime" ] }
+fasthash = "0.4.0"
+serde = "1.0.145"
+base64 = "0.13.0"
+redis = { version = "0.22.1", features = ["connection-manager", "tokio-comp", "aio"] }
+deadpool-redis = "0.10.2"
+deadpool = "0.9.5"
+thiserror = "1.0.37"
