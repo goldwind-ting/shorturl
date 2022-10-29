@@ -1400,6 +1400,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tower-http",
 ]
 
 [[package]]

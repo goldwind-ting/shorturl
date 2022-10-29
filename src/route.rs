@@ -13,8 +13,10 @@ use mongodb::{
     Client,
 };
 use serde::{Deserialize, Serialize};
+use tower_http::cors::{AllowMethods, Any, CorsLayer};
 
 use crate::{
+    config::{DATABASE, MONGODB_ADDRESS},
     db::{connect_db, init_redis},
     error::Error,
 };
@@ -25,7 +27,6 @@ const TABLES: [char; 64] = [
     'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
     '5', '6', '7', '8', '9', '+', '/',
 ];
-const DATABASE: &'static str = "short_url";
 
 #[derive(Clone)]
 pub struct Srv {
@@ -34,26 +35,30 @@ pub struct Srv {
 }
 
 pub async fn app() -> Router<Srv> {
-    let db = connect_db("mongodb://localhost:27017").await;
+    let db = connect_db(MONGODB_ADDRESS).await;
     let rds = init_redis().await;
     let srv = Srv { db, rds };
+    let cors = CorsLayer::new()
+        .allow_methods(AllowMethods::any())
+        .allow_origin(Any);
     Router::with_state(srv)
         .route("/", get(ok))
         .route("/short", post(short_url))
         .route("/query", get(query))
+        .layer(cors)
 }
 
 async fn ok() -> &'static str {
     "OK"
 }
 
-fn collection_name(hash: &str) -> String{
+fn collection_name(hash: &str) -> String {
     let firstchar = hash.chars().nth(0).unwrap();
-    if firstchar.is_ascii_uppercase(){
+    if firstchar.is_ascii_uppercase() {
         return String::from("upper");
-    }else if firstchar.is_ascii_lowercase(){
+    } else if firstchar.is_ascii_lowercase() {
         return String::from("lower");
-    }else{
+    } else {
         return String::from("digit");
     }
 }
@@ -63,6 +68,9 @@ struct UrlBody {
     original_url: String,
 }
 
+/// Shortening url, when two URLs have same hash, increase the sequence,
+///
+/// but note that the maximum of sequence is 15.
 async fn short_url(
     State(srv): State<Srv>,
     Json(body): Json<UrlBody>,
@@ -71,10 +79,13 @@ async fn short_url(
         return Err(Error::ParamsError);
     }
     let hash = city::hash32(&body.original_url);
-    
+
     let conf = Config::new(CharacterSet::Standard, false);
     let short_url = encode_config(hash.to_be_bytes(), conf);
-    let col = srv.db.database(DATABASE).collection::<Document>(&collection_name(&short_url));
+    let col = srv
+        .db
+        .database(DATABASE)
+        .collection::<Document>(&collection_name(&short_url));
     let count = col
         .count_documents(doc! { "short_url": short_url.as_str() }, None)
         .await
@@ -146,7 +157,10 @@ async fn query(
         resp.original_url.push_str(url.as_str());
         return Ok(Json(resp));
     }
-    let col = srv.db.database(DATABASE).collection::<Document>(&collection_name(&params.short_url));
+    let col = srv
+        .db
+        .database(DATABASE)
+        .collection::<Document>(&collection_name(&params.short_url));
     let builder = FindOneOptions::builder();
     let opt = builder.projection(Some(doc! { "original_url": 1 })).build();
     let row = col
